@@ -12,7 +12,7 @@ export function useMessages() {
     const messagesRef = ref(database, 'messages');
     
     // Listen for new messages
-    const unsubscribe = onValue(messagesRef, (snapshot) => {
+    onValue(messagesRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
         const messageList: Message[] = Object.entries(data).map(([key, value]: [string, any]) => ({
