@@ -1,15 +1,42 @@
 import { useState, useEffect, useRef } from 'react';
-import { ref, push, onValue, off, remove, query, orderByChild, startAt } from 'firebase/database';
+import { ref, push, onValue, off, remove, query, orderByChild, startAt, onDisconnect, serverTimestamp, set } from 'firebase/database';
 import { database } from '../firebase/config';
 import { Message } from '../types/message';
 
 export function useMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(1);
   const cleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const userPresenceRef = useRef<any>(null);
 
   useEffect(() => {
     const messagesRef = ref(database, 'messages');
+    const presenceRef = ref(database, 'presence');
+    
+    // Generate a unique session ID for this user
+    const sessionId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    userPresenceRef.current = ref(database, `presence/${sessionId}`);
+    
+    // Set user as online
+    set(userPresenceRef.current, {
+      online: true,
+      timestamp: serverTimestamp()
+    });
+    
+    // Remove user when they disconnect
+    onDisconnect(userPresenceRef.current).remove();
+    
+    // Listen for online users count
+    onValue(presenceRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        const onlineUsers = Object.keys(data).length;
+        setOnlineCount(onlineUsers);
+      } else {
+        setOnlineCount(1);
+      }
+    });
     
     // Listen for new messages
     onValue(messagesRef, (snapshot) => {
@@ -44,6 +71,10 @@ export function useMessages() {
 
     return () => {
       off(messagesRef);
+      off(presenceRef);
+      if (userPresenceRef.current) {
+        remove(userPresenceRef.current).catch(console.error);
+      }
       if (cleanupIntervalRef.current) {
         clearInterval(cleanupIntervalRef.current);
       }
@@ -99,5 +130,6 @@ export function useMessages() {
     messages,
     sendMessage,
     isConnected,
+    onlineCount,
   };
 } 

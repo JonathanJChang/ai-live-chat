@@ -1,160 +1,217 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, AlertTriangle } from 'lucide-react';
+import { Send, Clock, Zap, Shield } from 'lucide-react';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
+  lastMessageTime?: number;
 }
 
-const TYPING_TIMEOUT = 20000; // 20 seconds
-const WARNING_THRESHOLD = 5000; // Show warning at 5 seconds remaining
-
-export function MessageInput({ onSendMessage, disabled = false }: MessageInputProps) {
+export function MessageInput({ onSendMessage, disabled = false, lastMessageTime = 0 }: MessageInputProps) {
   const [message, setMessage] = useState('');
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [isTyping, setIsTyping] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
-  
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [timeRemaining, setTimeRemaining] = useState(20);
+  const [isActive, setIsActive] = useState(false);
+  const [isRateLimited, setIsRateLimited] = useState(false);
+  const [rateLimitRemaining, setRateLimitRemaining] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const rateLimitIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
+  // Check rate limit status
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
-  const startTypingTimer = () => {
-    // Clear existing timers
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-
-    setIsTyping(true);
-    setTimeRemaining(TYPING_TIMEOUT / 1000);
-    setShowWarning(false);
-
-    // Update countdown every second
-    intervalRef.current = setInterval(() => {
-      setTimeRemaining((prev) => {
-        const newTime = prev - 1;
-        if (newTime <= WARNING_THRESHOLD / 1000) {
-          setShowWarning(true);
-        }
-        return newTime;
-      });
-    }, 1000);
-
-    // Clear message after timeout
-    timeoutRef.current = setTimeout(() => {
-      setMessage('');
-      setIsTyping(false);
-      setTimeRemaining(0);
-      setShowWarning(false);
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      inputRef.current?.focus();
-    }, TYPING_TIMEOUT);
-  };
-
-  const stopTypingTimer = () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    setIsTyping(false);
-    setTimeRemaining(0);
-    setShowWarning(false);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    
-    if (value.length > 0 && !isTyping) {
-      startTypingTimer();
-    } else if (value.length === 0 && isTyping) {
-      stopTypingTimer();
+    if (lastMessageTime > 0) {
+      const now = Date.now();
+      const timeSinceLastMessage = now - lastMessageTime;
+      const rateLimitTime = 2000; // 2 seconds
+      
+      if (timeSinceLastMessage < rateLimitTime) {
+        setIsRateLimited(true);
+        setRateLimitRemaining(Math.ceil((rateLimitTime - timeSinceLastMessage) / 1000));
+        
+        rateLimitIntervalRef.current = setInterval(() => {
+          const currentTime = Date.now();
+          const currentTimeSince = currentTime - lastMessageTime;
+          
+          if (currentTimeSince >= rateLimitTime) {
+            setIsRateLimited(false);
+            setRateLimitRemaining(0);
+            if (rateLimitIntervalRef.current) {
+              clearInterval(rateLimitIntervalRef.current);
+              rateLimitIntervalRef.current = null;
+            }
+          } else {
+            setRateLimitRemaining(Math.ceil((rateLimitTime - currentTimeSince) / 1000));
+          }
+        }, 100);
+      }
     }
-    
-    setMessage(value);
+
+    return () => {
+      if (rateLimitIntervalRef.current) {
+        clearInterval(rateLimitIntervalRef.current);
+      }
+    };
+  }, [lastMessageTime]);
+
+  const startTimer = () => {
+    if (!isActive) {
+      setIsActive(true);
+      setTimeRemaining(20);
+      
+      intervalRef.current = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1) {
+            handleReset();
+            return 20;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+  };
+
+  const handleReset = () => {
+    setIsActive(false);
+    setTimeRemaining(20);
+    setMessage('');
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (message.trim() && !disabled && !isRateLimited) {
+      onSendMessage(message);
+      handleReset();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setMessage(value);
     
-    if (message.trim() && !disabled) {
-      onSendMessage(message.trim());
-      setMessage('');
-      stopTypingTimer();
-      inputRef.current?.focus();
+    if (value.trim() && !isActive) {
+      startTimer();
+    } else if (!value.trim() && isActive) {
+      handleReset();
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      if (rateLimitIntervalRef.current) {
+        clearInterval(rateLimitIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const getTimerColor = () => {
+    if (timeRemaining > 10) return 'text-emerald-500';
+    if (timeRemaining > 5) return 'text-amber-500';
+    return 'text-rose-500 animate-pulse';
   };
 
-  const progressPercent = isTyping ? (timeRemaining / (TYPING_TIMEOUT / 1000)) * 100 : 100;
+  const getInputBorderColor = () => {
+    if (isRateLimited) return 'border-rose-300 focus:border-rose-400';
+    if (timeRemaining > 10) return 'border-emerald-300 focus:border-emerald-400';
+    if (timeRemaining > 5) return 'border-amber-300 focus:border-amber-400';
+    return 'border-rose-300 focus:border-rose-400';
+  };
+
+  const getBackgroundGlow = () => {
+    if (isRateLimited) return 'shadow-rose-200/50';
+    if (timeRemaining <= 5) return 'shadow-rose-200/50';
+    if (timeRemaining <= 10) return 'shadow-amber-200/50';
+    return 'shadow-emerald-200/50';
+  };
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      {/* Typing timer bar */}
-      {isTyping && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between mb-2">
-            <div className={`flex items-center gap-2 text-sm font-medium ${
-              showWarning ? 'text-red-600' : 'text-blue-600'
-            }`}>
-              {showWarning && <AlertTriangle size={16} />}
-              <span>
-                {showWarning ? 'Time running out!' : 'Typing timer:'} {timeRemaining}s
-              </span>
-            </div>
-          </div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-1000 ease-linear ${
-                showWarning ? 'bg-red-500' : 'bg-blue-500'
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
+    <div className="p-6">
+      {/* Rate limit warning */}
+      {isRateLimited && (
+        <div className="flex items-center justify-center mb-4">
+          <div className="flex items-center gap-3 px-6 py-3 rounded-full bg-rose-100 border-2 border-rose-300 animate-pulse">
+            <Shield size={24} className="text-rose-500" />
+            <span className="text-xl font-bold text-rose-600">
+              Wait {rateLimitRemaining}s before sending another message! 🛡️
+            </span>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="flex gap-3">
-        <div className="flex-1">
-          <textarea
-            ref={inputRef}
-            value={message}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            placeholder="Type your message... (20s timer starts when you begin typing)"
-            disabled={disabled}
-            className={`w-full p-3 border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-              disabled ? 'bg-gray-100 text-gray-500' : 'bg-white'
-            } ${showWarning ? 'border-red-300 ring-red-200' : 'border-gray-300'}`}
-            rows={2}
-            maxLength={500}
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            {message.length}/500 characters
+      {/* Timer display */}
+      {isActive && !isRateLimited && (
+        <div className="flex items-center justify-center mb-4">
+          <div className={`flex items-center gap-3 px-6 py-3 rounded-full bg-white/90 backdrop-blur-sm shadow-lg border-2 ${
+            timeRemaining <= 5 ? 'border-rose-300 animate-bounce' : 
+            timeRemaining <= 10 ? 'border-amber-300' : 'border-emerald-300'
+          }`}>
+            {timeRemaining <= 5 ? (
+              <Zap size={24} className="text-rose-500 animate-pulse" />
+            ) : (
+              <Clock size={24} className={getTimerColor()} />
+            )}
+            <span className={`text-2xl font-bold ${getTimerColor()}`}>
+              {timeRemaining}s
+            </span>
+            {timeRemaining <= 5 && <span className="text-2xl animate-bounce">⚡</span>}
           </div>
         </div>
-        
+      )}
+
+      <form onSubmit={handleSubmit} className="flex gap-4 items-end">
+        <div className="flex-1">
+          <div className={`relative bg-white rounded-3xl shadow-lg border-2 ${getInputBorderColor()} ${getBackgroundGlow()} transition-all duration-300`}>
+            <input
+              ref={inputRef}
+              type="text"
+              value={message}
+              onChange={handleInputChange}
+              disabled={disabled || isRateLimited}
+              placeholder={
+                disabled ? "🔄 Connecting..." : 
+                isRateLimited ? "⏳ Rate limited - please wait..." :
+                "🎭 Type your magical message here... ✨"
+              }
+              className="w-full px-6 py-4 text-xl font-medium bg-transparent rounded-3xl focus:outline-none placeholder-indigo-300 text-gray-700"
+              maxLength={500}
+            />
+            
+            {/* Character count */}
+            <div className="absolute right-4 bottom-1 text-sm text-indigo-400 font-medium">
+              {message.length}/500
+            </div>
+          </div>
+        </div>
+
         <button
           type="submit"
-          disabled={!message.trim() || disabled}
-          className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-            message.trim() && !disabled
-              ? 'bg-blue-500 hover:bg-blue-600 text-white'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          disabled={!message.trim() || disabled || isRateLimited}
+          className={`p-4 rounded-full shadow-lg transition-all duration-300 transform ${
+            !message.trim() || disabled || isRateLimited
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-indigo-300 to-purple-300 text-indigo-700 hover:from-indigo-400 hover:to-purple-400 hover:scale-110 shadow-indigo-200/50'
           }`}
         >
-          <Send size={20} />
+          <Send size={24} />
         </button>
       </form>
+
+      {/* Fun hint */}
+      {!isActive && !disabled && !isRateLimited && (
+        <div className="text-center mt-4">
+          <p className="text-indigo-500/80 text-lg font-medium flex items-center justify-center gap-2">
+            <span className="text-xl">💡</span>
+            Start typing to begin the 20-second countdown!
+            <span className="text-xl">🚀</span>
+          </p>
+        </div>
+      )}
     </div>
   );
 } 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Clock } from 'lucide-react';
+import { Clock, Sparkles } from 'lucide-react';
 import { Message } from '../types/message';
 
 interface MessageItemProps {
@@ -40,56 +40,82 @@ export function MessageItem({ message, isOwnMessage }: MessageItemProps) {
   };
 
   const getProgressColor = () => {
-    if (progress > 50) return 'bg-green-500';
-    if (progress > 25) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (progress > 50) return 'bg-gradient-to-r from-emerald-200 to-green-300';
+    if (progress > 25) return 'bg-gradient-to-r from-amber-200 to-yellow-300';
+    return 'bg-gradient-to-r from-rose-200 to-pink-300';
+  };
+
+  const getMessageEmoji = () => {
+    const emojis = ['💫', '✨', '🌟', '⭐', '🎭', '🎪', '🎨', '🎯', '🎲', '🎊'];
+    return emojis[Math.floor(Math.random() * emojis.length)];
   };
 
   return (
     <div 
-      className={`animate-slide-in mb-3 max-w-xs lg:max-w-md ${
+      className={`animate-bounce-in mb-6 max-w-md lg:max-w-lg transform transition-all duration-300 hover:scale-105 ${
         isOwnMessage ? 'ml-auto' : 'mr-auto'
       }`}
     >
       <div
-        className={`relative p-4 rounded-2xl shadow-lg ${
+        className={`relative p-6 rounded-3xl shadow-lg border-2 transform transition-all duration-300 ${
           isOwnMessage
-            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white'
-            : 'bg-white text-gray-800 border border-gray-200'
+            ? 'bg-gradient-to-br from-indigo-100 via-purple-100 to-blue-100 text-gray-700 border-indigo-200'
+            : 'bg-gradient-to-br from-amber-50 via-orange-50 to-pink-50 text-gray-700 border-orange-200'
         }`}
       >
+        {/* Floating sparkle */}
+        <div className={`absolute -top-2 ${isOwnMessage ? '-left-2' : '-right-2'}`}>
+          <Sparkles size={20} className={`${isOwnMessage ? 'text-amber-400' : 'text-indigo-400'} animate-pulse`} />
+        </div>
+
         {/* Message content */}
-        <div className="mb-2">
-          <p className="text-sm font-medium mb-1">
+        <div className="mb-4">
+          <p className={`text-lg font-bold mb-3 flex items-center gap-2 ${
+            isOwnMessage ? 'text-indigo-600' : 'text-amber-700'
+          }`}>
+            <span className="text-xl">{getMessageEmoji()}</span>
             {message.username}
+            <span className="text-xl">🐾</span>
           </p>
-          <p className="text-base leading-relaxed break-words">
+          <p className="text-xl leading-relaxed break-words font-medium text-gray-700">
             {message.text}
           </p>
         </div>
 
         {/* Timestamp and time remaining */}
-        <div className={`flex items-center justify-between text-xs ${
-          isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+        <div className={`flex items-center justify-between text-base font-bold ${
+          isOwnMessage ? 'text-indigo-500' : 'text-amber-600'
         }`}>
-          <div className="flex items-center gap-1">
-            <Clock size={12} />
+          <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-full shadow-sm">
+            <Clock size={16} />
             <span>{formatTime(message.timestamp)}</span>
           </div>
-          <span className="font-medium">
-            {timeRemaining}s
-          </span>
+          <div className="flex items-center gap-2 bg-white/60 px-3 py-2 rounded-full shadow-sm">
+            <span className="text-lg">⏰</span>
+            <span className="text-lg">
+              {timeRemaining}s
+            </span>
+          </div>
         </div>
 
         {/* Progress bar */}
-        <div className={`mt-2 h-1 rounded-full ${
-          isOwnMessage ? 'bg-blue-400' : 'bg-gray-200'
-        }`}>
+        <div className={`mt-4 h-3 rounded-full ${
+          isOwnMessage ? 'bg-indigo-100/80' : 'bg-orange-100/80'
+        } overflow-hidden`}>
           <div
-            className={`h-full rounded-full transition-all duration-100 ease-linear ${getProgressColor()}`}
+            className={`h-full rounded-full transition-all duration-100 ease-linear shadow-sm ${getProgressColor()}`}
             style={{ width: `${progress}%` }}
           />
         </div>
+
+        {/* Fun bubble tail */}
+        <div className={`absolute bottom-0 ${
+          isOwnMessage 
+            ? 'right-6 transform rotate-45 bg-gradient-to-br from-indigo-100 to-purple-100' 
+            : 'left-6 transform -rotate-45 bg-gradient-to-br from-amber-50 to-orange-50'
+        } w-4 h-4 translate-y-2 border-2 ${
+          isOwnMessage ? 'border-indigo-200' : 'border-orange-200'
+        }`}></div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, Users } from 'lucide-react';
+import { MessageCircle, Users, Sparkles } from 'lucide-react';
 import { useMessages } from './hooks/useMessages';
 import { MessageItem } from './components/MessageItem';
 import { MessageInput } from './components/MessageInput';
@@ -10,7 +10,8 @@ import { UserData } from './types/message';
 function App() {
   const [currentUser, setCurrentUser] = useState<UserData | null>(null);
   const [onlineUsers, setOnlineUsers] = useState(1);
-  const { messages, sendMessage, isConnected } = useMessages();
+  const [lastMessageTime, setLastMessageTime] = useState(0);
+  const { messages, sendMessage, isConnected, onlineCount } = useMessages();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize user on first load
@@ -33,70 +34,66 @@ function App() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Simulate online users count (in a real app, this would come from Firebase)
+  // Update online users count from Firebase
   useEffect(() => {
-    const interval = setInterval(() => {
-      setOnlineUsers(Math.floor(Math.random() * 50) + 1);
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, []);
+    setOnlineUsers(onlineCount);
+  }, [onlineCount]);
 
   const handleSendMessage = async (messageText: string) => {
     if (!currentUser) return;
 
+    // Rate limiting: only allow 1 message every 2 seconds
+    const now = Date.now();
+    if (now - lastMessageTime < 2000) {
+      // Could show a toast or error message here
+      console.log('Rate limited: Please wait before sending another message');
+      return;
+    }
+
     try {
       await sendMessage(messageText, currentUser.username, currentUser.id);
+      setLastMessageTime(now);
     } catch (error) {
       console.error('Failed to send message:', error);
       // In a real app, you'd show a user-friendly error message
     }
   };
 
-  const resetUser = () => {
-    const newUser: UserData = {
-      id: generateUserId(),
-      username: generateRandomAnimalName(),
-    };
-    setCurrentUser(newUser);
-    localStorage.setItem('chatUser', JSON.stringify(newUser));
-  };
-
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Initializing...</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center bg-white p-12 rounded-3xl shadow-lg">
+          <div className="animate-spin rounded-full h-20 w-20 border-8 border-indigo-100 border-t-indigo-300 mx-auto"></div>
+          <p className="mt-6 text-2xl text-indigo-400 font-bold">Getting ready... 🎉</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <header className="bg-gradient-to-r from-indigo-200 to-purple-200 shadow-lg">
+        <div className="max-w-6xl mx-auto px-6 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500 rounded-lg">
-                <MessageCircle className="text-white" size={24} />
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-white rounded-full shadow-md">
+                <MessageCircle className="text-indigo-400" size={32} />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">
-                  AI Live Chat
+                <h1 className="text-3xl font-bold text-indigo-700 flex items-center gap-2">
+                  AI Live Chat <Sparkles className="text-amber-300" size={28} />
                 </h1>
-                <p className="text-sm text-gray-600">
-                  Anonymous real-time conversations
+                <p className="text-xl text-indigo-500 font-medium">
+                  🎪 Anonymous fun conversations! 🎭
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Users size={16} />
-                <span>{onlineUsers} online</span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3 text-lg text-indigo-600 bg-white/60 px-6 py-3 rounded-full shadow-md">
+                <Users size={24} />
+                <span className="font-bold">{onlineUsers} online! 🌟</span>
               </div>
               <ConnectionStatus isConnected={isConnected} />
             </div>
@@ -105,35 +102,47 @@ function App() {
       </header>
 
       {/* User info */}
-      <div className="max-w-4xl mx-auto px-4 py-3">
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">You are chatting as:</p>
-              <p className="font-semibold text-blue-600">{currentUser.username}</p>
-            </div>
-            <button
-              onClick={resetUser}
-              className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors"
-            >
-              New Identity
-            </button>
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="bg-gradient-to-r from-amber-100 to-yellow-100 rounded-3xl shadow-md p-6 mb-6 border-2 border-amber-200">
+          <div className="text-center">
+            <p className="text-lg text-amber-700 font-medium">🎭 You are chatting as:</p>
+            <p className="text-2xl font-bold text-amber-800 flex items-center justify-center gap-2">
+              🐾 {currentUser.username} ✨
+            </p>
           </div>
         </div>
 
         {/* Chat info */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <div className="p-1 bg-yellow-200 rounded">
-              <MessageCircle size={16} className="text-yellow-700" />
+        <div className="bg-gradient-to-r from-cyan-100 to-blue-100 border-2 border-cyan-200 rounded-3xl p-6 mb-6 shadow-md">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-cyan-200 rounded-full">
+              <MessageCircle size={24} className="text-cyan-600" />
             </div>
-            <div className="text-sm text-yellow-800">
-              <p className="font-medium mb-1">How it works:</p>
-              <ul className="space-y-1 text-xs">
-                <li>• Messages disappear after 10 seconds</li>
-                <li>• You have 20 seconds to type and send a message</li>
-                <li>• Everyone gets a random animal username</li>
-                <li>• Chat in real-time with people around the world</li>
+            <div className="text-cyan-700">
+              <p className="text-2xl font-bold mb-3 flex items-center gap-2">
+                🎪 How the magic works! ✨
+              </p>
+              <ul className="space-y-2 text-lg font-medium">
+                <li className="flex items-center gap-2">
+                  <span className="text-2xl">⏰</span>
+                  Messages vanish after 10 seconds!
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-2xl">⚡</span>
+                  You have 20 seconds to type & send!
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-2xl">🛡️</span>
+                  Rate limited: 1 message every 2 seconds max!
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-2xl">🐾</span>
+                  Everyone gets a fun animal name!
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-2xl">🌍</span>
+                  Chat with people from around the world!
+                </li>
               </ul>
             </div>
           </div>
@@ -141,16 +150,17 @@ function App() {
       </div>
 
       {/* Messages container */}
-      <div className="max-w-4xl mx-auto px-4 pb-20">
-        <div className="bg-white rounded-lg shadow-sm min-h-96 max-h-96 overflow-y-auto">
-          <div className="p-4">
+      <div className="max-w-6xl mx-auto px-6 pb-32">
+        <div className="bg-white rounded-3xl shadow-lg min-h-96 max-h-96 overflow-y-auto border-2 border-indigo-100">
+          <div className="p-6">
             {messages.length === 0 ? (
-              <div className="text-center py-12">
-                <MessageCircle size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">No messages yet. Start the conversation!</p>
+              <div className="text-center py-16">
+                <div className="text-8xl mb-6">💬</div>
+                <p className="text-2xl text-indigo-400 font-bold mb-2">No messages yet!</p>
+                <p className="text-xl text-indigo-300">Start the fun conversation! 🎉</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {messages.map((message) => (
                   <MessageItem
                     key={message.id}
@@ -166,11 +176,12 @@ function App() {
       </div>
 
       {/* Message input - fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white shadow-lg">
-        <div className="max-w-4xl mx-auto">
+      <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-indigo-200 to-purple-200 shadow-lg border-t-2 border-indigo-100">
+        <div className="max-w-6xl mx-auto">
           <MessageInput
             onSendMessage={handleSendMessage}
             disabled={!isConnected}
+            lastMessageTime={lastMessageTime}
           />
         </div>
       </div>

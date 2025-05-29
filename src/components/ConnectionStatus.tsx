@@ -6,20 +6,20 @@ interface ConnectionStatusProps {
 
 export function ConnectionStatus({ isConnected }: ConnectionStatusProps) {
   return (
-    <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-full ${
+    <div className={`flex items-center gap-3 text-lg font-bold px-6 py-3 rounded-full shadow-md border-2 transition-all duration-300 ${
       isConnected 
-        ? 'bg-green-100 text-green-700' 
-        : 'bg-red-100 text-red-700'
+        ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-600 border-emerald-200 animate-pulse' 
+        : 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-600 border-rose-200'
     }`}>
       {isConnected ? (
         <>
-          <Wifi size={16} />
-          <span>Connected</span>
+          <Wifi size={20} />
+          <span>🌟 Connected!</span>
         </>
       ) : (
         <>
-          <WifiOff size={16} />
-          <span>Disconnected</span>
+          <WifiOff size={20} />
+          <span>⚠️ Disconnected</span>
         </>
       )}
     </div>
